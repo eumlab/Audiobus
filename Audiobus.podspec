@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = 'Audiobus'
-  s.version = '1.0.2.5'
+  s.version = '2.1'
   s.license = ''
   s.summary = 'Audiobus SDK'
   s.homepage = 'http://developer.audiob.us/'

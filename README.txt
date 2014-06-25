@@ -1,5 +1,5 @@
-Audiobus SDK -- Version 1.0.2.5 -- Nov 19 2013
-==============================================
+Audiobus SDK -- Version 2.1 -- June 23 2014
+===========================================
 
 Thanks for downloading the Audiobus distribution!
 
@@ -16,6 +16,15 @@ http://audiob.us
 
 Changes
 =======
+
+2.1
+---
+
+Major new update, with Inter-App Audio integration, state saving, a new connection panel
+design and an easier, cleaner, simpler API.
+
+Check out our [migration guide](http://developer.audiob.us/migrate) for details.
+
 
 1.0.2.5
 -------
@@ -132,7 +141,7 @@ Fixes:
     different timeline (e.g. moving between Remote IO input and Audiobus audio).
   - Fixed a logic error in the mixer/syncer unit.
   - Addressed scenario where an input port is connected to an output port
-    of the same app (when allowsMultipleInstancesInConnectionGraph is set):
+    of the same app (when allowsConnectionsToSelf is set):
     ABInputPortReceiveLive will now return silence if this is the case, and the
     ABInputPortAttributePlaysLiveAudio flag, if set on the input port, 
     will be hidden from the output port in order to prevent output muting
