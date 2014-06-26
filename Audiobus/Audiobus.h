@@ -18,7 +18,7 @@
 #import "ABAnimatedTrigger.h"
 #import "ABMultiStreamBuffer.h"
 
-#define ABSDKVersionString @"2.1"
+#define ABSDKVersionString @"2.1.1"
 
 /*!
 @mainpage
@@ -54,7 +54,7 @@
  through the process of integrating Audiobus.
  
  The process involves:
- - [Adding the Audiobus SDK files to your project](@ref Project-Setup),
+ - [Adding the Audiobus SDK files to your project](@ref Project-Setup), with or without CocoaPods,
  - [Enabling Inter-App Audio and Background Audio](@ref Audio-Setup),
  - Creating a [launch URL](@ref Launch-URL) and [registering your app with us](@ref Register-App),
  - Creating instances of the [Audiobus Controller](@ref Create-Controller), and
@@ -226,8 +226,25 @@
  
 @section Project-Setup 2. Add the Audiobus SDK to Your Project
 
- Audiobus is distributed as a static library, plus the associated header files. Follow these
- steps to set up your project with Audiobus:
+ Audiobus is distributed as a static library, plus the associated header files.
+ 
+ The easiest way to add Audiobus to your project is using [CocoaPods](http://cocoapods.org):
+ 
+ 1. Add "pod 'Audiobus'" to your Podfile, or, if you don't have one: at the top level of your project
+    folder, create a file called "Podfile" with the following content:
+    @code
+    pod 'Audiobus'
+    @endcode
+ 2. Then, in the terminal and in the same folder, type:
+    @code
+    pod install
+    @endcode
+    You will be asked for a login: use your Audiobus developer center email and password.
+    
+    In the future when you're updating your app, use `pod outdated` to check for available updates,
+    and `pod update` to apply those updates.
+ 
+ Alternatively, if you aren't using CocoaPods:
 
  1. Copy libAudiobus.a and the associated header files into an appropriate place within
     your project directory. We recommend putting these within an "Audiobus" folder within a "Library"

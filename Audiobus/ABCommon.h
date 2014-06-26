@@ -29,7 +29,7 @@ typedef enum {
  */
 typedef uint32_t ABPeerResourceID;
 
-int _ABAssert(int condition, char* msg, char* file, int line);
+int _ABAssert(BOOL condition, char* msg, char* file, int line);
 
 #define ABAssert(condition,msg) (_ABAssert((BOOL)(condition),(msg),strrchr(__FILE__, '/')+1,__LINE__))
 
