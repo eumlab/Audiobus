@@ -18,7 +18,7 @@
 #import "ABAnimatedTrigger.h"
 #import "ABMultiStreamBuffer.h"
 
-#define ABSDKVersionString @"2.1.1"
+#define ABSDKVersionString @"2.1.2"
 
 /*!
 @mainpage
@@ -222,6 +222,12 @@
  in sender and filter ports, among other things.
  
  Removing this `[audio addAudioUnitPropertyListener]` line addresses the problem.
+ </blockquote>
+ 
+ <blockquote class="alert" id="audio-session-warning">
+ If you're interacting with the audio session (via AVAudioSession or the old C API), you **must** set the
+ audio session category and "mix with others" flag *before* setting the audio session active. If you do
+ this the other way around, you'll get some weird behaviour, like silent output when used with IAA.
  </blockquote>
  
 @section Project-Setup 2. Add the Audiobus SDK to Your Project
@@ -488,6 +494,12 @@
  this property setting, causing other apps to be interrupted despite the mix property being set.
  Consequently, be sure to reset the `kAudioSessionProperty_OverrideCategoryMixWithOthers` property value
  whenever you assign any audio session properties.
+ 
+ <blockquote class="alert" id="audio-session-warning">
+ If you're interacting with the audio session (via AVAudioSession or the old C API), you **must** set the
+ audio session category and "mix with others" flag *before* setting the audio session active. If you do
+ this the other way around, you'll get some weird behaviour, like silent output when used with IAA.
+ </blockquote>
 
 @section Create-Controller 7. Instantiate the Audiobus Controller
 
@@ -526,6 +538,10 @@
  Audiobus peer discovery will fail, causing your app to refuse to respond to the Audiobus app. If you
  need to take more than a second or two to initialise your app, initialise the Audiobus controller afterwards,
  or do that processing in a background thread.
+ 
+ > You must initialise ABAudiobusController as close to app launch as is possible, and you must keep the instance
+ > around for the entire life of your app. If you release and create a new instance of ABAudiobusController, you
+ > will see some odd behaviour, such as your app failing to connect to Audiobus.
  
  Create the ABAudiobusController instance, passing it the API key that you generated when you registered 
  your app in [Step 5](@ref Register-App):
@@ -612,11 +628,11 @@
  sender port at all, then you send audio by calling @link ABSenderPort::ABSenderPortSend ABSenderPortSend @endlink,
  then mute your audio output depending on the value of @link ABSenderPort::ABSenderPortIsMuted ABSenderPortIsMuted @endlink.
 
- > If you are already publishing your app's audio unit via AudioOutputUnitPublish, and you are planning on using
- > ABSenderPort *and not initialising it with your audio unit* (not recommended), you **must not** publish your
- > own audio unit, but allow ABSenderPort to do this publishing for you. Otherwise, both your own audio unit
- > and the ABSenderPort's internal audio unit will be published with the same AudioComponentDescription, resulting
- > in unexpected behaviour like silent output.
+ > ABSenderPort when initialized without an audio unit will create and publish its own audio unit with the
+ > AudioComponentDescription you pass into the initializer. If you are planning on using ABSenderPort without an audio
+ > unit (you're not passing an audio unit into the initializer), then you **must not** publish any other audio unit with
+ > the same AudioComponentDescription. Otherwise, *two audio units will be published with the same AudioComponentDescription*, 
+ > which would be bad, and would result in unexpected behaviour like silent output.
  > <br/>
  > If you're using ABSenderPort without an audio unit for the purposes of offering a new, separate audio stream
  > with a different AudioComponentDescription, though, you're fine.
@@ -636,8 +652,7 @@
                                  audioComponentDescription:(AudioComponentDescription) {
                                      .componentType = kAudioUnitType_RemoteGenerator,
                                      .componentSubType = 'aout', // Note single quotes
-                                     .componentManufacturer = 'you!',
-                                     .componentVersion = 1 }
+                                     .componentManufacturer = 'you!' }
                                                  audioUnit:_audioUnit];
  
  [_audiobusController addSenderPort:sender];
@@ -686,8 +701,7 @@
                         audioComponentDescription:(AudioComponentDescription) {
                             .componentType = kAudioUnitType_RemoteEffect,
                             .componentSubType = 'myfx',
-                            .componentManufacturer = 'you!',
-                            .componentVersion = 1 }
+                            .componentManufacturer = 'you!' }
                                         audioUnit:_ioUnit];
  
  [_audiobusController addFilterPort:_filter];
@@ -703,8 +717,7 @@
                         audioComponentDescription:(AudioComponentDescription) {
                             .componentType = kAudioUnitType_RemoteEffect,
                             .componentSubType = 'myfx',
-                            .componentManufacturer = 'you!',
-                            .componentVersion = 1 }
+                            .componentManufacturer = 'you!' }
                                      processBlock:^(AudioBufferList *audio, UInt32 frames, AudioTimeStamp *timestamp) {
                                          // Process audio here
                                      } processBlockSize:0];
@@ -714,11 +727,11 @@
  your app's normal audio output when the filter port is connected. See the 
  [Filter Port recipe](@ref Filter-Port-Recipe) for details.
  
- > If you are already publishing your app's audio unit via AudioOutputUnitPublish, and you are planning on using
- > ABFilterPort *with a filter block* (not recommended), you **must not** publish your
- > own audio unit, but allow ABFilterPort to do this publishing for you. Otherwise, both your own audio unit
- > and the ABFilterPort's internal audio unit will be published with the same AudioComponentDescription, resulting
- > in unexpected behaviour like silent output.
+ > ABFilterPort, when initialized with a filter block (instead of an audio unit) will create and publish its own audio unit with the
+ > AudioComponentDescription you pass into the initializer. If you are planning on using ABFilterPort with a process block,
+ > instead of an audio unit, then you **must not** publish any other audio unit with
+ > the same AudioComponentDescription. Otherwise, *two audio units will be published with the same AudioComponentDescription*,
+ > which would be bad, and would result in unexpected behaviour like silent output.
  > <br/>
  > If you're using ABFilterPort with a filter block for the purposes of offering a new, separate audio processing
  > facility, separate from your published audio unit, and with a different AudioComponentDescription, though, you're fine.
@@ -864,8 +877,11 @@
  Developer Center and fill in any missing port details.
  
  We **strongly recommend** that you drop your compiled Info.plist into the indicated area in order to automatically
- populate the fields; this helps to ensure the details are free of errors, which could otherwise cause some 
- "Port Unavailable" errors to be seen.
+ populate the fields:
+ 
+ 1. This is much faster than putting them in yourself.
+ 2. This will ensure the details are free of errors, which could otherwise cause some "Port Unavailable" errors to be seen.
+ 3. This checks that you're not using AudioComponent fields that are already in use in another app, which would cause problems.
  
  Filling in the port details here allows all of your app's ports to be seen within Audiobus prior to your
  app being launched.
@@ -1142,8 +1158,7 @@
                                     audioComponentDescription:(AudioComponentDescription) {
                                         .componentType = kAudioUnitType_RemoteGenerator,
                                         .componentSubType = 'aout',
-                                        .componentManufacturer = 'you!',
-                                        .componentVersion = 1 }];
+                                        .componentManufacturer = 'you!' }];
     sender.clientFormat = [MyAudioEngine myAudioDescription];
     [_audiobusController addSenderPort:_sender];
 
@@ -1210,8 +1225,7 @@
                            audioComponentDescription:(AudioComponentDescription) {
                                .componentType = kAudioUnitType_RemoteEffect,
                                .componentSubType = 'myfx',
-                               .componentManufacturer = 'you!',
-                               .componentVersion = 1 }
+                               .componentManufacturer = 'you!' }
                                         processBlock:^(AudioBufferList *audio, UInt32 frames, AudioTimeStamp *timestamp) {
                                             processAudio(audio);
                                         } processBlockSize:0];

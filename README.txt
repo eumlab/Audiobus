@@ -1,4 +1,4 @@
-Audiobus SDK -- Version 2.1.1 -- June 25 2014
+Audiobus SDK -- Version 2.1.2 -- July 4 2014
 =============================================
 
 Thanks for downloading the Audiobus distribution!
@@ -17,11 +17,19 @@ http://audiob.us
 Changes
 =======
 
+2.1.2
+-------
+
+ - Widen draggable surface area for connection panel drag-in tab
+ - Revised muting policy for apps with multiple sender ports
+ - Fixed an issue with filters muting when a new, un-launched source is added
+
 2.1.1
 -----
 
  - Fixed an assertion problem during state restoring ("must have completionBlock")
  - Fixed an audio conversion issue with ABReceiverPort with receiveMixedAudio = NO
+ - Added some extra Info.plist sanity checks
 
 2.1
 ---
