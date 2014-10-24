@@ -13,6 +13,7 @@ extern "C" {
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import "ABPort.h"
+#import "ABLocalPort.h"
 #import "ABCommon.h"
 
 /*!
@@ -43,7 +44,7 @@ typedef void (^ABAudioFilterBlock)(AudioBufferList *audio, UInt32 frames, AudioT
  *  See the integration guide's section on using the [Filter Port](@ref Create-Filter-Port)
  *  for discussion.
  */
-@interface ABFilterPort : ABPort
+@interface ABFilterPort : ABPort <ABLocalPort>
 
 /*!
  * Initialize
@@ -134,9 +135,22 @@ BOOL ABFilterPortIsConnected(ABFilterPort *filterPort);
 @property (nonatomic, strong, readonly) NSArray *destinations;
 
 /*!
- * Whether the port is connected
+ * Whether the port is connected (via IAA or Audiobus)
  */
 @property (nonatomic, readonly) BOOL connected;
+
+/*!
+ * Whether the port is connected via Inter-App Audio
+ *
+ * Note that this property will also return YES when connected to
+ * Audiobus peers using the 2.1 SDK.
+ */
+@property (nonatomic, readonly) BOOL interAppAudioConnected;
+
+/*!
+ * Whether the port is connected via Audiobus
+ */
+@property (nonatomic, readonly) BOOL audiobusConnected;
 
 /*!
  * The AudioComponentDescription, of type kAudioUnitType_RemoteEffect or kAudioUnitType_RemoteMusicEffect,

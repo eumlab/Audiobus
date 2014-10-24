@@ -39,9 +39,32 @@ extern NSString * const ABPeerDisappearedNotification;
  *
  *  Sent when the local app's connections have changed, caused by connections
  *  or disconnections from within the Audiobus app.
+ *
+ *  Note that due to the asynchronous nature of Inter-App Audio connections
+ *  within Audiobus when connected to peers using the 2.1 Audiobus SDK or above, 
+ *  you may see several of these notifications during a connection or disconnection.
  */
 extern NSString * const ABConnectionsChangedNotification;
 
+/*!
+ * Connected
+ *
+ *  Sent when the app state transitioned from disconnected, to connected.
+ *
+ *  Note that due to the asynchronous nature of Inter-App Audio connections
+ *  within Audiobus when connected to peers using the 2.1 Audiobus SDK or above, 
+ *  you may see this notification before the @link interAppAudioConnected @endlink or
+ *  @link audiobusConnected @endlink properties change to YES.
+ */
+extern NSString * const ABConnectedNotification;
+
+/*!
+ * Disconnected
+ *
+ *  Sent when the app state transitioned from connected, to disconnected.
+ */
+extern NSString * const ABDisconnectedNotification;
+    
 /*!
  * Peer attributes changed
  *
@@ -411,26 +434,58 @@ extern NSString * const ABPeerKey;
 
 /*!
  * Whether the app is connected to anything via Audiobus or Inter-App Audio
+ *
+ *  Note that due to the asynchronous nature of Inter-App Audio connections
+ *  within Audiobus when connected to peers using the 2.1 Audiobus SDK or above,
+ *  you may see this property change to YES before the @link audiobusConnected @endlink
+ *  and @link interAppAudioConnected @endlink are both YES.
  */
 @property (nonatomic, readonly) BOOL connected;
 
 /*!
  * Whether the app is connected to anything via Audiobus specifically (not Inter-App Audio)
+ *
+ *  Note that due to the asynchronous nature of Inter-App Audio connections
+ *  within Audiobus when connected to peers using the 2.1 Audiobus SDK or above, you may see
+ *  this property change to YES before the @link interAppAudioConnected @endlink property 
+ *  changes to YES, or vice versa.
+ *
  */
 @property (nonatomic, readonly) BOOL audiobusConnected;
 
 /*!
- * Whether the Audiobus app is running on this device
+ * Whether the port is connected via Inter-App Audio
+ *
+ *  Note that this property will also return YES when connected to
+ *  Audiobus peers using the 2.1 SDK.
+ *
+ *  Note that due to the asynchronous nature of Inter-App Audio connections
+ *  within Audiobus when connected to peers using the 2.1 Audiobus SDK or above, you may see
+ *  this property change to YES before the @link audiobusConnected @endlink property
+ *  changes to YES, or vice versa.
+ */
+@property (nonatomic, readonly) BOOL interAppAudioConnected;
+
+/*!
+ * Whether the app is part of an active Audiobus session
+ *
+ *  This property reflects whether your app is currently part of an active Audiobus session,
+ *  which means the app has been used with Audiobus before, and the Audiobus app is still running.
  *
  *  You should observe this property in order to manage your app's lifecycle: If your
  *  app moves to the background and this property is YES, the app should remain active
- *  in the background and continue monitoring this property. If the user quits the Audiobus
- *  app, and this property changes to NO, your app should immediately stop its audio engine
+ *  in the background and continue monitoring this property. If the Audiobus session ends,
+ *  and this property changes to NO, your app should immediately stop its audio engine
  *  and suspend, where appropriate.
  *
  *  See the [Lifecycle](@ref Lifecycle) section of the integration guide for
  *  futher discussion, or see the sample applications in the SDK distribution for example
  *  implementations.
+ */
+@property (nonatomic, readonly) BOOL memberOfActiveAudiobusSession;
+
+/*!
+ * Whether the Audiobus app is running on this device
  */
 @property (nonatomic, readonly) BOOL audiobusAppRunning;
 

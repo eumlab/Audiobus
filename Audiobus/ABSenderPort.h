@@ -14,6 +14,7 @@ extern "C" {
 #import <AudioToolbox/AudioToolbox.h>
 #import "ABCommon.h"
 #import "ABPort.h"
+#import "ABLocalPort.h"
     
 /*!
  * Sender port connections changed
@@ -31,7 +32,7 @@ extern NSString * const ABSenderPortConnectionsChangedNotification;
  *  See the integration guide on using the [Sender Port](@ref Create-Sender-Port)
  *  for discussion.
  */
-@interface ABSenderPort : ABPort
+@interface ABSenderPort : ABPort <ABLocalPort>
 
 /*!
  * Initialize
@@ -158,9 +159,22 @@ NSTimeInterval ABSenderPortGetAverageLatency(ABSenderPort *senderPort);
 @property (nonatomic, strong, readonly) NSArray *destinations;
 
 /*!
- * Whether the port is connected
+ * Whether the port is connected (via IAA or Audiobus)
  */
 @property (nonatomic, readonly) BOOL connected;
+
+/*!
+ * Whether the port is connected via Inter-App Audio
+ *
+ * Note that this property will also return YES when connected to
+ * Audiobus peers using the 2.1 SDK.
+ */
+@property (nonatomic, readonly) BOOL interAppAudioConnected;
+
+/*!
+ * Whether the port is connected via Audiobus
+ */
+@property (nonatomic, readonly) BOOL audiobusConnected;
 
 /*!
  * Whether the port is muted

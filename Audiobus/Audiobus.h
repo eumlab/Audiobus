@@ -18,7 +18,7 @@
 #import "ABAnimatedTrigger.h"
 #import "ABMultiStreamBuffer.h"
 
-#define ABSDKVersionString @"2.1.2"
+#define ABSDKVersionString @"2.1.4"
 
 /*!
 @mainpage
@@ -245,7 +245,7 @@
     @code
     pod install
     @endcode
-    You will be asked for a login: use your Audiobus developer center email and password.
+    You will be asked for a login: use your Audiobus Developer Center email and password.
     
     In the future when you're updating your app, use `pod outdated` to check for available updates,
     and `pod update` to apply those updates.
@@ -261,6 +261,7 @@
  3. Ensure the following frameworks are added to your build process (to add frameworks,
     select your app target's "Link Binary With Libraries" build phase, and click the "+"
     button):
+    - AVFoundation
     - CoreGraphics
     - Accelerate
     - AudioToolbox
@@ -321,13 +322,15 @@
  1. When your app moves to the background, you should only stop your audio engine if (a) you are
     not currently connected via either Audiobus or Inter-App Audio, which can be determined via
     the [connected](@ref ABAudiobusController::connected) property of ABAudiobusController and 
-    (b) Audiobus is not active, which can be determined via the 
-    [audiobusAppRunning](@ref ABAudiobusController::audiobusAppRunning) property. For example:
+    (b) you are not part of an active Audiobus session (i.e. your app has been used with Audiobus,
+    and Audiobus is still running), which can be determined via the
+    [memberOfActiveAudiobusSession](@ref ABAudiobusController::memberOfActiveAudiobusSession) property. 
+    For example:
  
      @code
      -(void)applicationDidEnterBackground:(NSNotification *)notification {
-         if ( !_audiobusController.connected && !_audiobusController.audiobusAppRunning && _audioEngine.running ) {
-            // Stop the audio engine, suspending the app, if Audiobus isn't running
+         if ( !_audiobusController.connected && !_audiobusController.memberOfActiveAudiobusSession ) {
+            // Stop the audio engine, suspending the app, if we're not connected, and we're not part of an active Audiobus session
             [_audioEngine stop];
          }
      }
@@ -338,19 +341,19 @@
     the two above properties. Once both are NO, stop your audio engine as appropriate:
  
     @code
-    static void * kAudiobusRunningOrConnectedChanged = &kAudiobusRunningOrConnectedChanged;
+    static void * kAudiobusConnectedOrActiveMemberChanged = &kAudiobusConnectedOrActiveMemberChanged;
  
     ...
  
-    // Watch the audiobusAppRunning and connected properties
+    // Watch the connected and memberOfActiveAudiobusSession properties
     [_audiobusController addObserver:self 
                           forKeyPath:@"connected"
                              options:0 
-                             context:kAudiobusRunningOrConnectedChanged];
+                             context:kAudiobusConnectedOrActiveMemberChanged];
     [_audiobusController addObserver:self 
-                          forKeyPath:@"audiobusAppRunning" 
+                          forKeyPath:@"memberOfActiveAudiobusSession"
                              options:0 
-                             context:kAudiobusRunningOrConnectedChanged];
+                             context:kAudiobusConnectedOrActiveMemberChanged];
  
     
     ...
@@ -360,13 +363,12 @@
                            change:(NSDictionary *)change
                           context:(void *)context {
  
-        if ( context == kAudiobusRunningOrConnectedChanged ) {
+        if ( context == kAudiobusConnectedOrActiveMemberChanged ) {
             if ( [UIApplication sharedApplication].applicationState == UIApplicationStateBackground
                    && !_audiobusController.connected
-                   && !_audiobusController.audiobusAppRunning
-                   && _audioEngine.running ) {
+                   && !_audiobusController.memberOfActiveAudiobusSession ) {
  
-                // Audiobus has quit. Time to sleep.
+                // Audiobus session is finished. Time to sleep.
                 [_audioEngine stop];
             }
         } else {
@@ -425,11 +427,18 @@
  in the background. The registry also allows users to discover and purchase apps that support Audiobus.
  
  Register your app, and receive an Audiobus API key, at the 
- [Audiobus app registration page](http://developer.audiob.us/new-app).
+ [Audiobus app registration page](http://developer.audiob.us/apps/register).
 
  You'll need to provide various details about your app, and you'll need to provide a copy of your
- compiled Info.plist from your app bundle, which Audiobus will use to populate the required fields.
+ **compiled** Info.plist from your compiled app bundle, which Audiobus will use to populate the required fields.
  You'll be able to edit all of these details up until the time you go live with your app.
+ 
+ <blockquote>
+ You must provide the **compiled** version of your Info.plist, not the one from your project folder.
+ You can find this by building your app, right-clicking on the app in the "Products" group of the 
+ Xcode project navigator, and clicking "Show in Finder", then right-clicking on the app bundle and 
+ selecting "Show Package Contents"
+ </blockquote>
  
  After you register, we will briefly review your application. Upon approval, you will be notified via
  email, which will include your Audiobus API key, and the app will be added to the Audiobus registry.
@@ -607,18 +616,31 @@
     - "type" (of type String): set this to "aurg", which means that we are identifying a "Remote Generator" audio unit,
       or "auri" for a "Remote Instrument" unit.
     - "subtype" (of type String): set this to any four-letter code that identifies the port.
-    - "name" (of type String): set this to the name of your app, or another string that identifies your app and the port.
+    - "name" (of type String): Apple recommend that you set this to "Manufacturer: App name" (see [WWDC 2013 session 602,
+      page 37](http://devstreaming.apple.com/videos/wwdc/2013/602xcx2xk6ipx0cusjryu1sx5eu/602/602.pdf?dl=1)). If you
+      publish multiple ports, you will need to identify the particular port, too. We propose "Manufacturer: App name (Port name)".
+      Note that this field does not need to match the name or title you pass to ABSenderPort.
     - "version" (of type Number): set this to any integer (whole number) you like. "1" is a good place to start.
 
  Once you're done, it should look something like this:
 
- <img src="audio-component.jpg" title="Adding an Audio Component" width="456" height="129" />
+ <img src="audio-component.jpg" title="Adding an Audio Component" width="466" height="126" />
 
- > It's very important that you use a different AudioComponentDescription for each port. If you don't have a
- > unique AudioComponentDescription per port, you'll get all sorts of Inter-App Audio errors (like error -66750 or
- > -10879).
+ <blockquote class="alert">
+ It's very important that you use a different AudioComponentDescription for each port (represented by the type, subtype
+ and manufacturer fields). If you don't have a unique AudioComponentDescription per port, you'll get all sorts of
+ Inter-App Audio errors (like error -66750 or -10879).
  
- Now it's time to create an ABSenderPort instance. You provide a port name, for internal use, and a port 
+ The Audiobus Developer Center will check that your AudioComponentDescriptions are unique among the Audiobus community,
+ but this is not a guarantee of uniqueness among non-Audiobus apps.
+ </blockquote>
+ 
+ Note that Remote Generator (type 'aurg') and Remote Instrument (type 'auri') nodes are treated exactly the same within Audiobus.
+ The distinction between these two is specific to Inter-App Audio. Remote Generator nodes are simple audio sources, while
+ Remote Instrument nodes have the additional capability of accepting MIDI input over the Inter-App Audio channel and rendering
+ audio based on this input. Audiobus itself does not make use of this functionality at this time.
+ 
+ Now it's time to create an ABSenderPort instance. You provide a port name, for internal use, and a port
  title which is displayed to the user. You can localise the port title.
  
  You may choose to provide your IO audio unit (of type kAudioUnitSubType_RemoteIO), which will cause the sender port 
@@ -651,8 +673,8 @@
                                                      title:NSLocalizedString(@"Main App Output", @"")
                                  audioComponentDescription:(AudioComponentDescription) {
                                      .componentType = kAudioUnitType_RemoteGenerator,
-                                     .componentSubType = 'aout', // Note single quotes
-                                     .componentManufacturer = 'you!' }
+                                     .componentSubType = 'subt', // Note single quotes
+                                     .componentManufacturer = 'manu' }
                                                  audioUnit:_audioUnit];
  
  [_audiobusController addSenderPort:sender];
@@ -670,8 +692,13 @@
 
  If you've already integrated Inter-App Audio separately, you should hide your IAA transport and
  app switching UI while connected with Audiobus. This is to avoid confusion with the Audiobus Connection Panel.
- You can determine when your app is connected specifically to Audiobus, and not Inter-App Audio, via
- ABAudiobusController's [audiobusConnected](@ref ABAudiobusController::audiobusConnected) property.
+ You can determine when your app is connected specifically to Audiobus, and not Inter-App Audio alone, via
+ ABAudiobusController's [audiobusConnected](@ref ABAudiobusController::audiobusConnected) property. Note that
+ due to the asynchronous nature of Inter-App Audio connections within Audiobus when connected to peers using the 
+ 2.1 Audiobus SDK or above, you may see the [connected](@ref ABAudiobusController::connected) and
+ [interAppAudioConnected](@ref ABAudiobusController::interAppAudioConnected) properties change to YES before or
+ after the [audiobusConnected](@ref ABAudiobusController::audiobusConnected) property, so you need to be prepared
+ to adapt your UI to this environment.
  
  Conversely, note that when your app's ABSenderPort is hosted within an Inter-App Audio-compatible
  app outside of Audiobus, you are responsible for implementing the appropriate transport and app switch UI if
@@ -685,9 +712,14 @@
  Info.plist AudioComponents entry for your port, this time using 'aurx' as the type, which identifies the 
  port as a Remote Effect, or 'aurm' which identifies it as a Remote Music Effect.
 
- > It's very important that you use a different AudioComponentDescription for each port. If you don't have a
- > unique AudioComponentDescription per port, you'll get all sorts of Inter-App Audio errors (like error -66750 or
- > -10879).
+ <blockquote class="alert">
+ It's very important that you use a different AudioComponentDescription for each port (represented by the type, subtype
+ and manufacturer fields). If you don't have a unique AudioComponentDescription per port, you'll get all sorts of
+ Inter-App Audio errors (like error -66750 or -10879).
+ 
+ The Audiobus Developer Center will check that your AudioComponentDescriptions are unique among the Audiobus community,
+ but this is not a guarantee of uniqueness among non-Audiobus apps.
+ </blockquote>
  
  Then you create an ABFilterPort instance, passing in the port name, for internal use, and a title for
  display to the user.
@@ -749,36 +781,36 @@
  by checking to see if your app was launched via its Audiobus launch URL, and silencing the audio engine for the duration:
 
  @code
- @implementation AppDelegate
- ...
- - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
-     if ( [[url scheme] hasSuffix:@".audiobus"] ) {
-         // Tell the audio engine we were launched from Audiobus
-         [_audioEngine setLaunchedFromAudiobus];
-     }
-     
-     return YES;
+ @implementation MyAudioEngine
+ -(id)init {
+     ...
+     [[NSNotificationCenter defaultCenter] addObserver:self 
+                                              selector:@selector(applicationDidFinishLaunching:) 
+                                                  name:UIApplicationDidFinishLaunchingNotification 
+                                                object:nil];
+     ...
  }
  ...
- @end
-
+ -(void)dealloc {
+     ...
+     [[NSNotificationCenter defaultCenter] removeObserver:self];
+     ...
+ }
  ...
-
- @implementation MyAudioEngine
- ...
- -(void)setLaunchedFromAudiobus {
-     // If this effect app has been launched from within Audiobus, we need to silence our output for a little while
-     // to avoid feedback issues while the connection is established.
-     _launchedFromAudiobus = YES;
-     if ( _launchedFromAudiobus && !_audiobusController.connected ) {
-         // Mute
-         self.muted = YES;
-         
-         // Set a timeout for three seconds, after which we can assume there's actually no
-         // Audiobus connection forthcoming (something went wrong), and we should unmute
-         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-             self.muted = NO;
-         });
+ -(void)applicationDidFinishLaunching:(NSNotification*)notification {
+     if ( [[notification.userInfo[UIApplicationLaunchOptionsURLKey] scheme] hasSuffix:@".audiobus"] ) {
+         // If this effect app has been launched from within Audiobus, we need to silence our output for a little while
+         // to avoid feedback issues while the connection is established.
+         if ( !_audiobusController.connected ) {
+             // Mute
+             self.muted = YES;
+ 
+             // Set a timeout for three seconds, after which we can assume there's actually no
+             // Audiobus connection forthcoming (something went wrong), and we should unmute
+             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                 self.muted = NO;
+             });
+         }
      }
  }
  ...
@@ -794,8 +826,13 @@
 
  If you've already integrated Inter-App Audio separately, you should hide your IAA transport and
  app switching UI while connected with Audiobus. This is to avoid confusion with the Audiobus Connection Panel.
- You can determine when your app is connected specifically to Audiobus, and not Inter-App Audio, via
- ABAudiobusController's [audiobusConnected](@ref ABAudiobusController::audiobusConnected) property.
+ You can determine when your app is connected specifically to Audiobus, and not Inter-App Audio alone, via
+ ABAudiobusController's [audiobusConnected](@ref ABAudiobusController::audiobusConnected) property. Note that
+ due to the asynchronous nature of Inter-App Audio connections within Audiobus when connected to peers using the
+ 2.1 Audiobus SDK or above, you may see the [connected](@ref ABAudiobusController::connected) and
+ [interAppAudioConnected](@ref ABAudiobusController::interAppAudioConnected) properties change to YES before or
+ after the [audiobusConnected](@ref ABAudiobusController::audiobusConnected) property, so you need to be prepared
+ to adapt your UI to this environment.
  
  Conversely, note that when your app's ABFilterPort is hosted within an Inter-App Audio-compatible
  app outside of Audiobus, you are responsible for implementing the appropriate transport and app switch UI if
@@ -902,6 +939,11 @@
  
 @section Go-Live 10. Go Live
  
+ <blockquote class="alert">Before you submit your app to the App Store, please ensure the details of your registration at
+ the [apps page](http://developer.audiob.us/apps) are correct. If not, users may experience unexpected behaviour. The 
+ Audiobus app caches the local copy of the registration for 30 minutes, so if you make any fixes to your app registration 
+ after going live, some users may not see the fix for up to 30 minutes.</blockquote>
+ 
  Once the Audiobus-compatible version of your app has been approved by Apple and hits the App
  Store, you should visit the [apps page](http://developer.audiob.us/apps) and click "Go Live".
  
@@ -920,6 +962,15 @@
  depending on the ports you created.
 
  Congratulations! You are now Audiobus compatible.
+ 
+ > When it's time to update your app with new Audiobus functionality (such as a new Audiobus SDK version,
+ > or a new Audiobus-specific feature, like State Saving or the addition of more ports, be sure to
+ > register your new version from your app registration on [developer.audiob.us](http://developer.audiob.us/apps).
+ > Once you go live with the new version, this will move your app to the top of the Audiobus Compatible Apps
+ > directory, resulting in increased exposure.
+ >
+ > Note that you should never register your app twice: if you update your app, register a new version for
+ > your existing app registration.
 
  The next thing to do is read the important notes on [Being a Good Citizen](@ref Good-Citizen) to
  make sure your app behaves nicely with others. In particular, if your app records audio, it's
@@ -993,9 +1044,14 @@
    or you must avoid publishing your own audio unit. Otherwise, both your own audio unit and the port's internal
    unit will be published with the same AudioComponentDescription, resulting in unexpected behaviour like silent output.
  
- > It's very important that you use a different AudioComponentDescription for each port. If you don't have a
- > unique AudioComponentDescription per port, you'll get all sorts of Inter-App Audio errors (like error -66750 or
- > -10879).
+ <blockquote class="alert">
+ It's very important that you use a different AudioComponentDescription for each port (represented by the type, subtype
+ and manufacturer fields). If you don't have a unique AudioComponentDescription per port, you'll get all sorts of
+ Inter-App Audio errors (like error -66750 or -10879).
+ 
+ The Audiobus Developer Center will check that your AudioComponentDescriptions are unique among the Audiobus community,
+ but this is not a guarantee of uniqueness among non-Audiobus apps.
+ </blockquote>
  
  Additionally, the new SDK remains fully backwards-compatible with apps using the 1.x version of the Audiobus
  SDK, on iOS 7.
@@ -1102,11 +1158,12 @@
  @section Migration-Guide-Lifecycle Lifecycle
 
  We've added a new key-value-observable property to ABAudiobusController,
- @link ABAudiobusController::audiobusAppRunning audiobusAppRunning @endlink, which lets you determine whether the 
- Audiobus app is running on the device, and we've updated our recommended app lifecycle policy. We now recommend
+ @link ABAudiobusController::memberOfActiveAudiobusSession memberOfActiveAudiobusSession @endlink, which lets you 
+ determine whether your app is currently part of an active Audiobus session (i.e. your app's been used with Audiobus,
+ and the Audiobus app is still running), and we've updated our recommended app lifecycle policy. We now recommend
  that you keep your app running in the background whenever (a) your app is 
- [connected](@ref ABAudiobusController::connected), or (b) Audiobus is running, and only allow the app to suspend
- (by stopping your audio engine) once the Audiobus app closes. This keeps your app alive and responsive to
+ [connected](@ref ABAudiobusController::connected), or (b) part of an Audiobus session, and only allow the app to suspend
+ (by stopping your audio engine) once the session ends. This keeps your app alive and responsive to
  connection changes while the Audiobus session is active.
 
  Take a look at the [Lifecycle](@ref Lifecycle) section of the integration guide, and the
@@ -1157,8 +1214,8 @@
                                                         title:NSLocalizedString(@"Main App Output", @"")
                                     audioComponentDescription:(AudioComponentDescription) {
                                         .componentType = kAudioUnitType_RemoteGenerator,
-                                        .componentSubType = 'aout',
-                                        .componentManufacturer = 'you!' }];
+                                        .componentSubType = 'subt',
+                                        .componentManufacturer = 'manu' }];
     sender.clientFormat = [MyAudioEngine myAudioDescription];
     [_audiobusController addSenderPort:_sender];
 
@@ -1369,37 +1426,45 @@
  
  Once your app is connected via Audiobus, it should not under any circumstances suspend its 
  audio system when moving into the background. We also strongly recommend remaining active in the
- background while the Audiobus app is running, to keep your app available for use without needing
+ background while it's part of an active Audiobus session (i.e. the app's been used with Audiobus, and the
+ Audiobus app is still active), to keep your app available for use without needing
  to be re-launched. When moving to the background, the app can check the 
  [connected](@ref ABAudiobusController::connected) and
- [audiobusAppRunning](@ref ABAudiobusController::audiobusAppRunning) properties of the Audiobus controller,
- and only stop the audio system if the return value for each is NO.
- 
- If your app is in the background when the above properties become negative, indicating that your app
- is disconnected and that Audiobus has quit, we recommend shutting down the audio engine, as appropriate.
+ [memberOfActiveAudiobusSession](@ref ABAudiobusController::memberOfActiveAudiobusSession) properties of the Audiobus controller,
+ and only stop the audio system if both are false:
  
  @code
- static void * kAudiobusRunningOrConnectedChanged = &kAudiobusRunningOrConnectedChanged;
+ if ( !_audiobusController.connected && !_audiobusController.memberOfActiveAudiobusSession ) {
+     // Stop the audio engine, suspending the app, if we're not connected, and we're not part of an active Audiobus session
+     [self stop];
+ }
+ @endcode
+ 
+ If your app is in the background when the [memberOfActiveAudiobusSession](@ref ABAudiobusController::memberOfActiveAudiobusSession) property becomes
+ false, indicating that the session has ended, we recommend shutting down the audio engine, as appropriate.
+ 
+ @code
+ static void * kAudiobusConnectedOrActiveMemberChanged = &kAudiobusConnectedOrActiveMemberChanged;
  
  -(BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // ...
 
-    // Watch the audiobusAppRunning and connected properties
+    // Watch the connected and memberOfActiveAudiobusSession properties
     [_audiobusController addObserver:self
                          forKeyPath:@"connected"
                             options:0
-                            context:kAudiobusRunningOrConnectedChanged];
+                            context:kAudiobusConnectedOrActiveMemberChanged];
     [_audiobusController addObserver:self
-                         forKeyPath:@"audiobusAppRunning"
+                         forKeyPath:@"memberOfActiveAudiobusSession"
                             options:0
-                            context:kAudiobusRunningOrConnectedChanged];
+                            context:kAudiobusConnectedOrActiveMemberChanged];
 
     // ...
  }
  
  -(void)dealloc {
      [_audiobusController removeObserver:self forKeyPath:@"connected"];
-     [_audiobusController removeObserver:self forKeyPath:@"audiobusAppRunning"];
+     [_audiobusController removeObserver:self forKeyPath:@"memberOfActiveAudiobusSession"];
  }
  
  -(void)observeValueForKeyPath:(NSString *)keyPath
@@ -1407,13 +1472,12 @@
                        change:(NSDictionary *)change
                       context:(void *)context {
 
-    if ( context == kAudiobusRunningOrConnectedChanged ) {
+    if ( context == kAudiobusConnectedOrActiveMemberChanged ) {
         if ( [UIApplication sharedApplication].applicationState == UIApplicationStateBackground
                && !_audiobusController.connected
-               && !_audiobusController.audiobusAppRunning
-               && _audioEngine.running ) {
+               && !_audiobusController.memberOfActiveAudiobusSession ) {
 
-            // Audiobus has quit. Time to sleep.
+            // Audiobus session is finished. Time to sleep.
             [_audioEngine stop];
         }
     } else {
@@ -1422,9 +1486,9 @@
  }
  
  -(void)applicationDidEnterBackground:(NSNotification *)notification {
-     if ( !_audiobusController.connected && !_audiobusController.audiobusAppRunning && _audioEngine.running ) {
-        // Stop the audio engine, suspending the app, if Audiobus isn't running
-        [_audioEngine stop];
+     if ( !_audiobusController.connected && !_audiobusController.memberOfActiveAudiobusSession ) {
+         // Stop the audio engine, suspending the app, if we're not connected, and we're not part of an active Audiobus session
+         [self stop];
      }
  }
  
@@ -1919,7 +1983,7 @@
  See the [Lifecycle](@ref Lifecycle) section of the integration guide, or the [associated recipe](@ref Lifecycle-Recipe)
  for further details.
  
- Note that during development, if your app has not yet been [registered](http://developer.audiob.us/new-app)
+ Note that during development, if your app has not yet been [registered](http://developer.audiob.us/apps/register)
  with Audiobus, Audiobus will not be able to see the app if it is not actively running in the background.
  Consequently, we **strongly recommend** that you register your app at the beginning of development.
  

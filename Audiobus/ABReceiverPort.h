@@ -14,6 +14,7 @@ extern "C" {
 #import <AudioToolbox/AudioToolbox.h>
 #import "ABCommon.h"
 #import "ABPort.h"
+#import "ABLocalPort.h"
 
 /*!
  * Receiver port connections changed
@@ -73,7 +74,7 @@ extern NSString * const ABReceiverPortPortKey;
  *  See the integration guide's section on using the [Receiver Port](@ref Create-Receiver-Port),
  *  and the [Receiver Port](@ref Receiver-Port) section in the documentation for details.
  */
-@interface ABReceiverPort : ABPort
+@interface ABReceiverPort : ABPort <ABLocalPort>
 
 /*!
  * Initialize
@@ -218,12 +219,12 @@ BOOL ABReceiverPortIsConnectedToSelf(ABReceiverPort *receiverPort);
  *  You may use this method to gain direct access to the audio unit for a source
  *  in order to perform custom Inter-App Audio interactions, such as MIDI exchange.
  *
- *  Watch the ABReceiverPortPortInterAppAudioUnitWillInitializeNotification notificatino
+ *  Watch the @link ABReceiverPortPortInterAppAudioUnitWillInitializeNotification @endlink notification
  *  to be informed when an audio unit for a port that is being connected is about to be
  *  initialised. You can use this to set IAA host transport callbacks.
- *  Watch ABReceiverPortPortInterAppAudioUnitConnectedNotification notification
+ *  Watch @link ABReceiverPortPortInterAppAudioUnitConnectedNotification @endlink notification
  *  to be informed when an audio unit for a connected port has been connected.
- *  Watch ABReceiverPortPortInterAppAudioUnitDisconnectedNotification to be notified
+ *  Watch @link ABReceiverPortPortInterAppAudioUnitDisconnectedNotification @endlink to be notified
  *  when an audio unit has been disconnected, after which you should not access the
  *  audio unit again.
  *  
@@ -234,7 +235,7 @@ BOOL ABReceiverPortIsConnectedToSelf(ABReceiverPort *receiverPort);
  *  disconnection, or an error like the source app crashing, the audio unit will be
  *  invalidated. If you retain references to audio units returned from this method,
  *  it's very important that you observe the 
- *  ABReceiverPortPortInterAppAudioUnitDisconnectedNotification notification, and 
+ *  @link ABReceiverPortPortInterAppAudioUnitDisconnectedNotification @endlink notification, and 
  *  unset your references.
  *
  * @param port              Source port
@@ -250,9 +251,22 @@ BOOL ABReceiverPortIsConnectedToSelf(ABReceiverPort *receiverPort);
 @property (nonatomic, strong, readonly) NSArray *sources;
 
 /*!
- * Whether the port is connected
+ * Whether the port is connected (via IAA or Audiobus)
  */
 @property (nonatomic, readonly) BOOL connected;
+
+/*!
+ * Whether the port is connected via Inter-App Audio
+ *
+ * Note that this property will also return YES when connected to
+ * Audiobus peers using the 2.1 SDK.
+ */
+@property (nonatomic, readonly) BOOL interAppAudioConnected;
+
+/*!
+ * Whether the port is connected via Audiobus
+ */
+@property (nonatomic, readonly) BOOL audiobusConnected;
 
 /*!
  * Whether to receive audio as a mixed stream

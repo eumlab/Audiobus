@@ -1,5 +1,5 @@
-Audiobus SDK -- Version 2.1.2 -- July 4 2014
-=============================================
+Audiobus SDK -- Version 2.1.4 -- Oct 16 2014
+============================================
 
 Thanks for downloading the Audiobus distribution!
 
@@ -17,8 +17,36 @@ http://audiob.us
 Changes
 =======
 
+2.1.4
+-----
+
+ - Added 'audiobusConnected' and 'interAppAudioConnected' properties to local port classes
+ - Added 'interAppAudioConnected' property to ABAudiobusController
+ - Added 'memberOfActiveAudiobusSession' property to ABAudiobusController which replaces
+   'audiobusAppRunning' property in determining whether an app should remain active in the
+   background.
+ - Fixed an issue with ABSenderPort when created with user audio unit and connected to self
+ - Adjusted buffering in ABSenderPortSend to allow for non-hardware buffer duration
+   enqueue lengths
+ - Improvements to internal buffering mechanisms
+ - Addressed issue when setting a sender or filter port's audioUnit property to NULL
+ - Addressed a Bonjour namespace collision issue
+ - Adjusted 'connected' state change notification behaviour
+ - Tweaked IAA shutdown
+
+2.1.3
+-----
+
+ - Fixed connection panel position issues on iOS 8 when built with Xcode 6
+ - Fixed issues resuming after audio session interruption
+ - Fixed an occasional crash when run from debugger
+ - Added support for reporting IAA hosting issues via Audiobus UI
+ - Added checking for String-typed "version" AudioComponents field
+ - Revised handling for disconnection in sample code
+ - Avoid a possible crash when recreating network socket
+
 2.1.2
--------
+-----
 
  - Widen draggable surface area for connection panel drag-in tab
  - Revised muting policy for apps with multiple sender ports
